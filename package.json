@@ -1,0 +1,15 @@
+{
+  "name": "react-native-sfmobilepush",
+  "version": "0.1.0",
+  "description": "Salesforce Jorney Builder wrapper for react-native",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/workco/react-native-sfmobilepush"
+  },
+  "author": "Henrique Shiraiwa",
+  "license": "MIT",
+  "peerDependencies": {
+    "react-native": "0.55.4"
+  }
+}

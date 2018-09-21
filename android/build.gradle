@@ -1,0 +1,48 @@
+buildscript {
+    repositories {
+        google()
+        jcenter()
+    }
+    dependencies {
+        // Matches the RN Hello World template
+        // https://github.com/facebook/react-native/blob/1e8f3b11027fe0a7514b4fc97d0798d3c64bc895/local-cli/templates/HelloWorld/android/build.gradle#L8
+        classpath 'com.android.tools.build:gradle:3.0.1'
+    }
+}
+apply plugin: 'com.android.library'
+apply plugin: 'maven'
+def DEFAULT_COMPILE_SDK_VERSION = 27
+def DEFAULT_BUILD_TOOLS_VERSION = "27.0.3"
+def DEFAULT_MIN_SDK_VERSION = 16
+def DEFAULT_TARGET_SDK_VERSION = 26
+android {
+    compileSdkVersion rootProject.ext.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : DEFAULT_COMPILE_SDK_VERSION
+    buildToolsVersion rootProject.ext.hasProperty('buildToolsVersion') ? rootProject.ext.buildToolsVersion : DEFAULT_BUILD_TOOLS_VERSION
+    defaultConfig {
+        minSdkVersion rootProject.ext.hasProperty('minSdkVersion') ? rootProject.ext.minSdkVersion : DEFAULT_MIN_SDK_VERSION
+        targetSdkVersion rootProject.ext.hasProperty('targetSdkVersion') ? rootProject.ext.targetSdkVersion : DEFAULT_TARGET_SDK_VERSION
+        versionCode 1
+        versionName "1.0"
+    }
+}
+repositories {
+    maven {
+        // All of React Native (JS, Obj-C sources, Android binaries) is installed from npm
+        // Matches the RN Hello World template
+        // https://github.com/facebook/react-native/blob/1e8f3b11027fe0a7514b4fc97d0798d3c64bc895/local-cli/templates/HelloWorld/android/build.gradle#L21
+        url "$projectDir/../node_modules/react-native/android"
+    }
+    maven {
+        url 'https://maven.google.com/'
+        name 'Google'
+    }
+    maven { url "http://salesforce-marketingcloud.github.io/JB4A-SDK-Android/repository" }
+    mavenCentral()
+}
+dependencies {
+    implementation 'com.facebook.react:react-native:+'
+    implementation ("com.salesforce.marketingcloud:marketingcloudsdk:5.6.2") {
+        exclude module: 'android-beacon-library'
+        exclude module: 'play-services-location'
+    }
+}
