@@ -21,7 +21,6 @@ RCT_REMAP_METHOD(init,
                  findEventsWithResolver:(RCTPromiseResolveBlock)resolve
                  rejecter:(RCTPromiseRejectBlock)reject)
 {
-    NSLog(@"testing init");
     if(isInitialized) {
         resolve(nil);
         return;
@@ -49,7 +48,6 @@ RCT_REMAP_METHOD(init,
     else {
         dispatch_async(dispatch_get_main_queue(), ^{
             if (@available(iOS 10, *)) {
-                [UNUserNotificationCenter currentNotificationCenter].delegate = self;
                 [[UNUserNotificationCenter currentNotificationCenter] requestAuthorizationWithOptions:UNAuthorizationOptionAlert | UNAuthorizationOptionSound | UNAuthorizationOptionBadge
                                                                                     completionHandler:^(BOOL granted, NSError * _Nullable error) {
                                                                                         if (error == nil) {
@@ -137,14 +135,6 @@ RCT_REMAP_METHOD(setAttribute,
 {
     [[MarketingCloudSDK sharedInstance] sfmc_setAttributeNamed:key value:value];
     resolve(nil);
-}
-
-- (void)userNotificationCenter:(UNUserNotificationCenter *)center didReceiveNotificationResponse:(UNNotificationResponse *)response withCompletionHandler:(void(^)(void))completionHandler {
-    [[MarketingCloudSDK sharedInstance] sfmc_setNotificationRequest:response.notification.request];
-
-    if (completionHandler != nil) {
-        completionHandler();
-    }
 }
 
 @end
