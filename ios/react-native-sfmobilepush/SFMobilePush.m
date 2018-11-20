@@ -36,13 +36,13 @@ RCT_REMAP_METHOD(init,
     NSData* jsonData = [NSJSONSerialization dataWithJSONObject:config options:NSJSONWritingPrettyPrinted error:&error];
     BOOL writeSuccess = [jsonData writeToURL:configPath options:NSAtomicWrite error:&error];
     if(!writeSuccess) {
-        reject(@"SFMobilePush_init_fail", @"SFMobilePush could not write the config data", error);
+        reject(@"SFMobilePush_init_fail",[NSString stringWithFormat:@"SFMobilePush could not write the config data: %@", [error localizedDescription]], error);
         return;
     }
 
     successful = [[MarketingCloudSDK sharedInstance] sfmc_configureWithURL:configPath configurationIndex:[NSNumber numberWithInteger:0]  error:&error];
     if (!successful) {
-        reject(@"SFMobilePush_init_fail", @"SFMobilePush could not be initialized", error);
+        reject(@"SFMobilePush_init_fail", [NSString stringWithFormat:@"SFMobilePush could not be initialized: %@", [error localizedDescription]], error);
         return;
     }
     else {
