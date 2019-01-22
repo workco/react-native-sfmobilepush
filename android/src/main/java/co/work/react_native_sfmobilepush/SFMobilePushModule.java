@@ -1,10 +1,12 @@
 package co.work.react_native_sfmobilepush;
 
 import android.app.Application;
+import android.app.NotificationChannel;
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.os.Build;
 import android.support.annotation.NonNull;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.app.NotificationManagerCompat;
@@ -23,6 +25,7 @@ import com.facebook.react.bridge.WritableNativeMap;
 import com.salesforce.marketingcloud.InitializationStatus;
 import com.salesforce.marketingcloud.MarketingCloudConfig;
 import com.salesforce.marketingcloud.MarketingCloudSdk;
+import com.salesforce.marketingcloud.notifications.NotificationCustomizationOptions;
 import com.salesforce.marketingcloud.notifications.NotificationManager;
 import com.salesforce.marketingcloud.notifications.NotificationMessage;
 
@@ -62,6 +65,15 @@ public class SFMobilePushModule extends ReactContextBaseJavaModule {
         }
     }
 
+    private String createNotificationChannel(String channelId, String channelName) {
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(channelId, channelName, android.app.NotificationManager.IMPORTANCE_DEFAULT);
+            android.app.NotificationManager notificationManager = this.application.getSystemService(android.app.NotificationManager.class);
+            notificationManager.createNotificationChannel(channel);
+        }
+        return channelId;
+    }
+
     @ReactMethod
     public void init(ReadableMap arguments, final Promise promise) {
         if (isInitialized) {
@@ -69,67 +81,56 @@ public class SFMobilePushModule extends ReactContextBaseJavaModule {
             return;
         }
         final String applicationId = getStringOrNull(arguments, "appId");
-        final String accessToken = getStringOrNull(arguments,"accessToken");
-        final String gcmSenderId = getStringOrNull(arguments,"gcmSenderId");
-        final String channelName = getStringOrNull(arguments,"channelName");
-        final String channelId = getStringOrNull(arguments,"channelId");
-        final String smallIcon = getStringOrNull(arguments,"smallIcon");
-        final String largeIcon = getStringOrNull(arguments,"largeIcon");
+        final String accessToken = getStringOrNull(arguments, "accessToken");
+        final String senderId = getStringOrNull(arguments, "senderId");
+        final String channelName = getStringOrNull(arguments, "channelName");
+        final String configChannelId = getStringOrNull(arguments, "channelId");
+        final String channelId = configChannelId != null ? createNotificationChannel(configChannelId, channelName) : NotificationManager.createDefaultNotificationChannel(this.application);
+        final String smallIcon = getStringOrNull(arguments, "smallIcon");
+        final String largeIcon = getStringOrNull(arguments, "largeIcon");
 
         try {
             String packageName = getReactApplicationContext().getPackageName();
             final Resources resources = getReactApplicationContext().getResources();
 
-            int smallIconId;
+            final int smallIconId;
             if (smallIcon != null) {
                 smallIconId = resources.getIdentifier(smallIcon, "mipmap", packageName);
             } else {
                 smallIconId = resources.getIdentifier("ic_notification", "mipmap", packageName);
             }
 
-            int largeIconId;
+            final int largeIconId;
             if (largeIcon != null) {
                 largeIconId = resources.getIdentifier(largeIcon, "mipmap", packageName);
             } else {
                 largeIconId = resources.getIdentifier("ic_launcher", "mipmap", packageName);
             }
             final Bitmap largeIconBitmap = BitmapFactory.decodeResource(resources, largeIconId);
-
-            NotificationManager.NotificationBuilder notificationBuilder = new NotificationManager.NotificationBuilder() {
+            final NotificationManager.NotificationBuilder notificationBuilder = new NotificationManager.NotificationBuilder() {
                 @Override
                 public NotificationCompat.Builder setupNotificationBuilder(@NonNull Context context, @NonNull NotificationMessage notificationMessage) {
                     NotificationCompat.Builder builder =
-                            NotificationManager.setupNotificationBuilder(context, notificationMessage);
-
+                            NotificationManager.getDefaultNotificationBuilder(context, notificationMessage, channelId, smallIconId);
                     builder.setLargeIcon(largeIconBitmap);
+                    builder.setSmallIcon(smallIconId);
 
                     return builder;
                 }
             };
 
-            MarketingCloudConfig.Builder config = MarketingCloudConfig
-                    .builder()
-                    .setApplicationId(applicationId)
-                    .setAccessToken(accessToken)
-                    .setGcmSenderId(gcmSenderId)
-                    .setNotificationChannelName(channelName)
-                    .setNotificationSmallIconResId(smallIconId)
-                    .setNotificationBuilder(notificationBuilder);
+            final NotificationCustomizationOptions customizationOptions = NotificationCustomizationOptions.create(notificationBuilder);
 
+            final MarketingCloudConfig config =
+                    MarketingCloudConfig
+                            .builder()
+                            .setApplicationId(applicationId)
+                            .setAccessToken(accessToken)
+                            .setSenderId(senderId)
+                            .setNotificationCustomizationOptions(customizationOptions)
+                            .build(this.application);
 
-
-
-            if (channelId != null) {
-                config.setNotificationChannelIdProvider(new NotificationManager.NotificationChannelIdProvider() {
-                    @Override
-                    public String getNotificationChannelId(@NonNull Context context, @NonNull NotificationMessage notificationMessage) {
-                        return channelId;
-                    }
-                });
-            }
-
-            MarketingCloudSdk.InitializationListener listener = new MarketingCloudSdk.InitializationListener() {
-
+            final MarketingCloudSdk.InitializationListener listener = new MarketingCloudSdk.InitializationListener() {
                 @Override
                 public void complete(@NonNull InitializationStatus initializationStatus) {
                     if (initializationStatus.isUsable()) {
@@ -140,11 +141,8 @@ public class SFMobilePushModule extends ReactContextBaseJavaModule {
                 }
             };
 
-            MarketingCloudSdk.init(
-                    this.application,
-                    config.build(),
-                    listener
-            );
+
+            MarketingCloudSdk.init(this.application, config, listener);
         } catch (Exception e) {
             promise.reject(e);
         }
@@ -277,7 +275,7 @@ public class SFMobilePushModule extends ReactContextBaseJavaModule {
                 @Override
                 public void ready(@NonNull MarketingCloudSdk marketingCloudSdk) {
                     //On the Android Version the SDK names SubscriberKey as ContactKey
-                    Map<String, String> attributesMap = marketingCloudSdk.getRegistrationManager().getAttributesMap();
+                    Map<String, String> attributesMap = marketingCloudSdk.getRegistrationManager().getAttributes();
                     WritableMap attributes = new WritableNativeMap();
                     for (Map.Entry<String, String> entry : attributesMap.entrySet()) {
                         attributes.putString(entry.getKey(), entry.getValue());
