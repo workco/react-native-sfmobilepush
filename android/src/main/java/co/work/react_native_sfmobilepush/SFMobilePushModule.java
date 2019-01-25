@@ -1,16 +1,21 @@
 package co.work.react_native_sfmobilepush;
 
+import android.app.Activity;
 import android.app.Application;
 import android.app.NotificationChannel;
+import android.app.PendingIntent;
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Build;
+import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.app.NotificationManagerCompat;
 
+import com.facebook.react.bridge.ActivityEventListener;
 import com.facebook.react.bridge.NoSuchKeyException;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -22,6 +27,7 @@ import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.WritableNativeArray;
 import com.facebook.react.bridge.WritableNativeMap;
+import com.facebook.react.modules.core.DeviceEventManagerModule;
 import com.salesforce.marketingcloud.InitializationStatus;
 import com.salesforce.marketingcloud.MarketingCloudConfig;
 import com.salesforce.marketingcloud.MarketingCloudSdk;
@@ -29,21 +35,95 @@ import com.salesforce.marketingcloud.notifications.NotificationCustomizationOpti
 import com.salesforce.marketingcloud.notifications.NotificationManager;
 import com.salesforce.marketingcloud.notifications.NotificationMessage;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 
-public class SFMobilePushModule extends ReactContextBaseJavaModule {
+public class SFMobilePushModule extends ReactContextBaseJavaModule implements ActivityEventListener {
+    static public final String SF_BUNDLE_IDENTIFIER = "SF_BUNDLE_IDENTIFIER";
+    static public final String EVENT_SF_NOTIFICATION = "SFMobilePushNotificationReceived";
+
     private final Application application;
     private boolean isInitialized = false;
 
     public SFMobilePushModule(ReactApplicationContext reactContext, Application application) {
         super(reactContext);
         this.application = application;
+        reactContext.addActivityEventListener(this);
+    }
+
+    @Override
+    public Map<String, Object> getConstants() {
+        final Map<String, Object> constants = new HashMap<>();
+        constants.put("notificationEvent", EVENT_SF_NOTIFICATION);
+        return constants;
     }
 
     @Override
     public String getName() {
         return "SFMobilePush";
+    }
+
+    private JSONObject bundleToJson(Bundle bundle) throws JSONException {
+        JSONObject json = new JSONObject();
+        Set<String> keys = bundle.keySet();
+        for (String key : keys) {
+            Object value = bundle.get(key);
+            if (value instanceof Bundle) {
+                json.put(key, bundleToJson((Bundle) value));
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                json.put(key, JSONObject.wrap(value));
+            } else {
+                json.put(key, value);
+            }
+        }
+        return json;
+    }
+
+    private String bundleToJsonString(Bundle bundle) {
+        try {
+            JSONObject json = bundleToJson(bundle);
+            return json.toString();
+        } catch (JSONException e) {
+            return null;
+        }
+    }
+
+    public void onNewIntent(Intent intent) {
+        Bundle bundle = intent.getExtras();
+
+        if (bundle != null && bundle.getBoolean(SF_BUNDLE_IDENTIFIER)) {
+            String bundleJSON = bundleToJsonString(bundle);
+            if (bundleJSON != null) {
+                getReactApplicationContext()
+                        .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
+                        .emit(EVENT_SF_NOTIFICATION, bundleJSON);
+            }
+        }
+    }
+
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        //Do nothing. This method is required to comply with ActivityEventListener
+    }
+
+    public void onActivityResult(Activity activity, int requestCode, int resultCode, Intent data) {
+        //Do nothing. This method is required to comply with ActivityEventListener
+    }
+
+    public Class getMainActivityClass() {
+        String packageName = application.getPackageName();
+        Intent launchIntent = application.getPackageManager().getLaunchIntentForPackage(packageName);
+        String className = launchIntent.getComponent().getClassName();
+        try {
+            return Class.forName(className);
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
     @ReactMethod
@@ -66,7 +146,7 @@ public class SFMobilePushModule extends ReactContextBaseJavaModule {
     }
 
     private String createNotificationChannel(String channelId, String channelName) {
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(channelId, channelName, android.app.NotificationManager.IMPORTANCE_DEFAULT);
             android.app.NotificationManager notificationManager = this.application.getSystemService(android.app.NotificationManager.class);
             notificationManager.createNotificationChannel(channel);
@@ -113,8 +193,20 @@ public class SFMobilePushModule extends ReactContextBaseJavaModule {
                     NotificationCompat.Builder builder =
                             NotificationManager.getDefaultNotificationBuilder(context, notificationMessage, channelId, smallIconId);
                     builder.setLargeIcon(largeIconBitmap);
-                    builder.setSmallIcon(smallIconId);
 
+                    Bundle bundle = new Bundle();
+                    bundle.putBoolean(SF_BUNDLE_IDENTIFIER, true);
+                    for (Map.Entry<String, String> entry : notificationMessage.payload().entrySet()) {
+                        bundle.putString(entry.getKey(), entry.getValue());
+                    }
+
+                    Intent intent = new Intent(context, getMainActivityClass());
+                    intent.putExtras(bundle);
+                    PendingIntent pendingIntent = PendingIntent.getActivity(context, new Random().nextInt(), intent,
+                            PendingIntent.FLAG_UPDATE_CURRENT);
+
+                    PendingIntent contentIntent = NotificationManager.redirectIntentForAnalytics(context, pendingIntent, notificationMessage, true);
+                    builder.setContentIntent(contentIntent);
                     return builder;
                 }
             };
@@ -288,6 +380,5 @@ public class SFMobilePushModule extends ReactContextBaseJavaModule {
             promise.reject(e);
         }
     }
-
 
 }

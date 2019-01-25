@@ -3,13 +3,46 @@
 #import <MarketingCloudSDK/MarketingCloudSDK.h>
 
 #define CONFIG_JSON_PATH @"sfconfig.json"
+#define NC_SF_REMOTE_NOTIFICATION @"NC_SF_REMOVE_NOTIFICATION"
+#define EVENT_SF_NOTIFICATION @"SFMobilePushNotificationReceived"
 
 @implementation SFMobilePush
-
 RCT_EXPORT_MODULE(SFMobilePush)
 BOOL isInitialized = NO;
 
-- (NSURL*) getConfigPath {
+- (NSArray<NSString *> *)supportedEvents
+{
+  return @[ EVENT_SF_NOTIFICATION ];
+}
+
+- (NSDictionary *)constantsToExport
+{
+    return @{ @"notificationEvent": EVENT_SF_NOTIFICATION };
+}
+
++ (void)didReceiveRemoteNotification:(UNNotificationResponse *) response 
+{
+    [[MarketingCloudSDK sharedInstance] sfmc_setNotificationRequest:response.notification.request];
+    NSDictionary *notification = response.notification.request.content.userInfo;
+    NSDictionary *userInfo = @{@"notification": notification};
+    [[NSNotificationCenter defaultCenter] postNotificationName:NC_SF_REMOTE_NOTIFICATION
+                                                      object:self
+                                                    userInfo:userInfo];
+}
+
+- (void)handleRemoteNotification:(NSNotification *) notification 
+{
+    NSMutableDictionary *remoteNotification = [NSMutableDictionary dictionaryWithDictionary:notification.userInfo[@"notification"]];
+    NSString *notificationId = [[NSUUID UUID] UUIDString];
+    remoteNotification[@"notificationId"] = notificationId;
+    remoteNotification[@"remote"] = @YES;
+
+    [self sendEventWithName:EVENT_SF_NOTIFICATION body:remoteNotification];
+}
+
+
+- (NSURL*) getConfigPath 
+{
     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *documentsDirectory = [paths objectAtIndex:0];
     NSString *appFile = [documentsDirectory stringByAppendingPathComponent:CONFIG_JSON_PATH];
@@ -70,6 +103,10 @@ RCT_REMAP_METHOD(init,
 #endif
                 [[UIApplication sharedApplication] registerForRemoteNotifications];
             }
+                [[NSNotificationCenter defaultCenter] addObserver:self
+                                                        selector:@selector(handleRemoteNotification:)
+                                                            name:NC_SF_REMOTE_NOTIFICATION
+                                                          object:nil];
             isInitialized = YES;
             resolve(nil);
         });

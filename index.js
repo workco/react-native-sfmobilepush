@@ -1,8 +1,29 @@
-import { NativeModules, PushNotificationIOS, Platform } from "react-native";
+import {
+  NativeEventEmitter,
+  NativeModules,
+  PushNotificationIOS,
+  Platform
+} from "react-native";
 
 const isIOS = Platform.OS === "ios";
 
 const { SFMobilePush } = NativeModules;
+
+const eventConverter = event => {
+  if (isIOS) {
+    return event;
+  } else {
+    return JSON.parse(event);
+  }
+};
+
+const convertListener = listener => event =>
+  listener(eventConverter(event));
+
+const notificationEmitter = new NativeEventEmitter(SFMobilePush);
+
+const registerNotificationHandler = listener => 
+  notificationEmitter.addListener(SFMobilePush.notificationEvent, convertListener(listener))
 
 const promiseIOSCheckPermissions = () =>
   new Promise(resolve => {
@@ -19,5 +40,6 @@ const checkPermissions = async () => {
 
 export default {
   ...SFMobilePush,
-  checkPermissions
+  checkPermissions,
+  registerNotificationHandler
 };
