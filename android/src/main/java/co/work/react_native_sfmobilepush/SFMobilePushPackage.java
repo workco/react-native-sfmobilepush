@@ -1,9 +1,6 @@
 package co.work.react_native_sfmobilepush;
 
-import android.app.Application;
-
 import com.facebook.react.ReactPackage;
-import com.facebook.react.bridge.JavaScriptModule;
 import com.facebook.react.bridge.NativeModule;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.uimanager.ViewManager;
@@ -14,12 +11,6 @@ import java.util.List;
 
 public class SFMobilePushPackage implements ReactPackage {
 
-    private final Application application;
-
-    public SFMobilePushPackage(Application application) {
-        this.application = application;
-    }
-
     @Override
     public List<ViewManager> createViewManagers(ReactApplicationContext reactContext) {
         return Collections.emptyList();
@@ -29,7 +20,7 @@ public class SFMobilePushPackage implements ReactPackage {
     public List<NativeModule> createNativeModules(
             ReactApplicationContext reactContext) {
         List<NativeModule> modules = new ArrayList<>();
-        modules.add(new SFMobilePushModule(reactContext, application));
+        modules.add(new SFMobilePushModule(reactContext));
         return modules;
     }
 }
