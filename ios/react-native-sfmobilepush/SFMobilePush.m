@@ -8,11 +8,20 @@
 
 @implementation SFMobilePush
 RCT_EXPORT_MODULE(SFMobilePush)
-BOOL isInitialized = NO;
+
+- (id) init
+{
+    self = [super init];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(handleRemoteNotification:)
+                                                 name:NC_SF_REMOTE_NOTIFICATION
+                                               object:nil];
+    return self;
+}
 
 - (NSArray<NSString *> *)supportedEvents
 {
-  return @[ EVENT_SF_NOTIFICATION ];
+    return @[ EVENT_SF_NOTIFICATION ];
 }
 
 - (NSDictionary *)constantsToExport
@@ -20,17 +29,33 @@ BOOL isInitialized = NO;
     return @{ @"notificationEvent": EVENT_SF_NOTIFICATION };
 }
 
-+ (void)didReceiveRemoteNotification:(UNNotificationResponse *) response 
++ (void)didReceiveRemoteNotification:(UNNotificationResponse *) response
 {
     [[MarketingCloudSDK sharedInstance] sfmc_setNotificationRequest:response.notification.request];
     NSDictionary *notification = response.notification.request.content.userInfo;
     NSDictionary *userInfo = @{@"notification": notification};
     [[NSNotificationCenter defaultCenter] postNotificationName:NC_SF_REMOTE_NOTIFICATION
-                                                      object:self
-                                                    userInfo:userInfo];
+                                                        object:self
+                                                      userInfo:userInfo];
 }
 
-- (void)handleRemoteNotification:(NSNotification *) notification 
++ (void)didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken
+{
+    [[MarketingCloudSDK sharedInstance] sfmc_setDeviceToken:deviceToken];
+}
+
++ (void)didReceiveRemoteNotificationUserInfo:(NSDictionary *) userInfo
+{
+    UNMutableNotificationContent *theSilentPushContent = [[UNMutableNotificationContent alloc] init];
+    theSilentPushContent.userInfo = userInfo;
+    UNNotificationRequest *theSilentPushRequest = [UNNotificationRequest requestWithIdentifier:[NSUUID UUID].UUIDString content:theSilentPushContent trigger:nil];
+
+    [[MarketingCloudSDK sharedInstance] sfmc_setNotificationRequest:theSilentPushRequest];
+}
+
+
+
+- (void)handleRemoteNotification:(NSNotification *) notification
 {
     NSMutableDictionary *remoteNotification = [NSMutableDictionary dictionaryWithDictionary:notification.userInfo[@"notification"]];
     NSString *notificationId = [[NSUUID UUID] UUIDString];
@@ -41,7 +66,7 @@ BOOL isInitialized = NO;
 }
 
 
-- (NSURL*) getConfigPath 
++ (NSURL*) getConfigPath
 {
     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *documentsDirectory = [paths objectAtIndex:0];
@@ -49,18 +74,9 @@ BOOL isInitialized = NO;
     return [NSURL fileURLWithPath:appFile];
 }
 
-RCT_REMAP_METHOD(init,
-                 arguments:(NSDictionary*)arguments
-                 findEventsWithResolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
++ (void)initialize:(NSString *) applicationId
+       accessToken:(NSString *) accessToken
 {
-    if(isInitialized) {
-        resolve(nil);
-        return;
-    }
-    NSString *applicationId = [arguments valueForKey:@"appId"];
-    NSString *accessToken = [arguments valueForKey:@"accessToken"];
-
     BOOL successful = NO;
     NSError *error = nil;
     NSDictionary* dict = [NSDictionary dictionaryWithObjectsAndKeys:applicationId, @"appid",accessToken, @"accesstoken",@YES, @"etanalytics",@YES, @"pianalytics", @YES, @"location", @YES, @"inbox", nil];
@@ -69,13 +85,11 @@ RCT_REMAP_METHOD(init,
     NSData* jsonData = [NSJSONSerialization dataWithJSONObject:config options:NSJSONWritingPrettyPrinted error:&error];
     BOOL writeSuccess = [jsonData writeToURL:configPath options:NSAtomicWrite error:&error];
     if(!writeSuccess) {
-        reject(@"SFMobilePush_init_fail",[NSString stringWithFormat:@"SFMobilePush could not write the config data: %@", [error localizedDescription]], error);
         return;
     }
 
     successful = [[MarketingCloudSDK sharedInstance] sfmc_configureWithURL:configPath configurationIndex:[NSNumber numberWithInteger:0]  error:&error];
     if (!successful) {
-        reject(@"SFMobilePush_init_fail", [NSString stringWithFormat:@"SFMobilePush could not be initialized: %@", [error localizedDescription]], error);
         return;
     }
     else {
@@ -103,12 +117,6 @@ RCT_REMAP_METHOD(init,
 #endif
                 [[UIApplication sharedApplication] registerForRemoteNotifications];
             }
-                [[NSNotificationCenter defaultCenter] addObserver:self
-                                                        selector:@selector(handleRemoteNotification:)
-                                                            name:NC_SF_REMOTE_NOTIFICATION
-                                                          object:nil];
-            isInitialized = YES;
-            resolve(nil);
         });
     }
 }

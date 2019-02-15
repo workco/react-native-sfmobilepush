@@ -1,6 +1,6 @@
 {
   "name": "react-native-sfmobilepush",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Salesforce Jorney Builder wrapper for react-native",
   "main": "index.js",
   "repository": {
