@@ -22,8 +22,12 @@ const convertListener = listener => event =>
 
 const notificationEmitter = new NativeEventEmitter(SFMobilePush);
 
-const registerNotificationHandler = listener => 
-  notificationEmitter.addListener(SFMobilePush.notificationEvent, convertListener(listener))
+const registerNotificationHandler = listener => {
+  if (!isIOS) {
+    SFMobilePush.getInitialNotification().then(convertListener(listener));
+  }
+  return notificationEmitter.addListener(SFMobilePush.notificationEvent, convertListener(listener))
+}
 
 const promiseIOSCheckPermissions = () =>
   new Promise(resolve => {

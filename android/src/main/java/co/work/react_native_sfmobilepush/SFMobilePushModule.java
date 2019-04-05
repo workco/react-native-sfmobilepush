@@ -95,6 +95,19 @@ public class SFMobilePushModule extends ReactContextBaseJavaModule implements Ac
     }
 
     @ReactMethod
+    public void getInitialNotification(Promise promise) {
+        try {
+            Activity activity = getCurrentActivity();
+            Bundle bundle = activity.getIntent().getExtras();
+            if (bundle != null && bundle.getBoolean(SF_BUNDLE_IDENTIFIER)) {
+                promise.resolve(bundleToJsonString(bundle));
+            }
+        } catch (Exception e) {
+            promise.reject(e);
+        }
+    }
+
+    @ReactMethod
     public void checkPermissions(Promise promise) {
         try {
             ReactContext reactContext = getReactApplicationContext();
