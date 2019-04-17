@@ -29,6 +29,11 @@ RCT_EXPORT_MODULE(SFMobilePush)
     return @{ @"notificationEvent": EVENT_SF_NOTIFICATION };
 }
 
++ (BOOL)requiresMainQueueSetup
+{
+    return NO;
+}
+
 + (void)didReceiveRemoteNotification:(UNNotificationResponse *) response
 {
     [[MarketingCloudSDK sharedInstance] sfmc_setNotificationRequest:response.notification.request];
